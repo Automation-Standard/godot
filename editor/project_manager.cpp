@@ -1266,7 +1266,7 @@ ProjectManager::ProjectManager(bool p_custom_res) {
 
 	{
 		title_bar = memnew(EditorTitleBar);
-		main_vbox->add_child(title_bar);
+		//main_vbox->add_child(title_bar);
 
 		if (can_expand) {
 			// Add spacer to avoid other controls under window minimize/maximize/close buttons (left side).
@@ -1497,7 +1497,7 @@ ProjectManager::ProjectManager(bool p_custom_res) {
 			run_btn->set_text(TTR("Run"));
 			run_btn->set_shortcut(ED_SHORTCUT("project_manager/run_project", TTRC("Run Project"), KeyModifierMask::CMD_OR_CTRL | Key::R));
 			run_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_run_project));
-			project_list_sidebar->add_child(run_btn);
+			//project_list_sidebar->add_child(run_btn);
 
 			rename_btn = memnew(Button);
 			rename_btn->set_text(TTR("Rename"));
@@ -1524,6 +1524,12 @@ ProjectManager::ProjectManager(bool p_custom_res) {
 			erase_missing_btn->set_text(TTR("Remove Missing"));
 			erase_missing_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_erase_missing_projects));
 			project_list_sidebar->add_child(erase_missing_btn);
+
+			quick_settings_button2 = memnew(Button);
+			quick_settings_button2->set_text(TTR("Settings"));
+			quick_settings_button2->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_show_quick_settings));
+			project_list_sidebar->add_child(quick_settings_button2);
+
 		}
 	}
 
