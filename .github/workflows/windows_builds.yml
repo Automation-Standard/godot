@@ -40,6 +40,15 @@ jobs:
             bin: ./bin/godot.windows.editor.x86_64.llvm.exe
             compiler: clang
 
+          - name: Editor w/ Mono (target=editor, tests=yes)
+            cache-name: windows-editor-mono
+            target: editor
+            tests: true
+            # Skip debug symbols, they're way too big with MSVC.
+            sconsflags: debug_symbols=no vsproj=yes vsproj_gen_only=no windows_subsystem=console module_mono_enabled=yes
+            bin: ./bin/godot.windows.editor.x86_64.exe
+            compiler: msvc
+
           - name: Template (target=template_release, tests=yes)
             cache-name: windows-template
             target: template_release
@@ -56,6 +65,14 @@ jobs:
             sconsflags: debug_symbols=no use_mingw=yes
             bin: ./bin/godot.windows.template_release.x86_64.console.exe
             compiler: gcc
+
+          - name: Template w/ Mono (target=template_release, tests=yes)
+            cache-name: windows-template-mono
+            target: template_release
+            tests: true
+            sconsflags: debug_symbols=no module_mono_enabled=yes
+            bin: ./bin/godot.windows.template_release.x86_64.console.exe
+            compiler: msvc
 
     steps:
       - name: Checkout
