@@ -246,7 +246,7 @@ private:
 	Node *target_node = nullptr;
 	Point2 drop_pos;
 
-	Node *focused_node = nullptr;
+	ObjectID focused_node_id = ObjectID();
 
 	EditorSelection *editor_selection = nullptr;
 

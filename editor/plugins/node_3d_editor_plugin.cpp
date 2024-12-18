@@ -2974,6 +2974,7 @@ void Node3DEditorViewport::_notification(int p_what) {
 			_update_navigation_controls_visibility();
 			_update_freelook(delta);
 
+			Node *focused_node = (Node *)ObjectDB::get_instance(focused_node_id);
 			if (focused_node && get_selected_count() > 0 && times_focused_consecutively >= 2 && times_focused_consecutively % 2 == 0) {
 				follow_mode->set_text(vformat(TTR("Following %s"), focused_node->get_name()));
 				follow_mode->set_button_icon(get_editor_theme_icon(focused_node->get_class()));
@@ -4389,9 +4390,9 @@ void Node3DEditorViewport::focus_selection() {
 	int count = 0;
 
 	const List<Node *> &selection = editor_selection->get_selected_node_list();
-	focused_node = nullptr;
+	focused_node_id = ObjectID();
 	if (!selection.is_empty()) {
-		focused_node = selection.front()->get();
+		focused_node_id = selection.front()->get()->get_instance_id();
 	}
 
 	for (Node *E : selection) {
