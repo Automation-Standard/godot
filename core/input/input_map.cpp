@@ -56,6 +56,7 @@ void InputMap::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("action_get_events", "action"), &InputMap::_action_get_events);
 	ClassDB::bind_method(D_METHOD("event_is_action", "event", "action", "exact_match"), &InputMap::event_is_action, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("load_from_project_settings"), &InputMap::load_from_project_settings);
+	ClassDB::bind_method(D_METHOD("load_default"), &InputMap::load_default);
 }
 
 /**
@@ -839,6 +840,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins_with_featur
 }
 
 void InputMap::load_default() {
+	input_map.clear();
 	HashMap<String, List<Ref<InputEvent>>> builtins = get_builtins_with_feature_overrides_applied();
 
 	for (const KeyValue<String, List<Ref<InputEvent>>> &E : builtins) {

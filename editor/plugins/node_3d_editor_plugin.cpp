@@ -52,6 +52,7 @@
 #include "editor/plugins/gizmos/collision_polygon_3d_gizmo_plugin.h"
 #include "editor/plugins/gizmos/collision_shape_3d_gizmo_plugin.h"
 #include "editor/plugins/gizmos/cpu_particles_3d_gizmo_plugin.h"
+#include "editor/editor_resource_picker.h"
 #include "editor/plugins/gizmos/decal_gizmo_plugin.h"
 #include "editor/plugins/gizmos/fog_volume_gizmo_plugin.h"
 #include "editor/plugins/gizmos/geometry_instance_3d_gizmo_plugin.h"
@@ -1690,6 +1691,11 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 				after = EditorPlugin::AFTER_GUI_INPUT_CUSTOM;
 			}
 		}
+	}
+
+	if (spatial_editor->first_person_mode) {
+		accept_event();
+		return;
 	}
 
 	Ref<InputEventMouseButton> b = p_event;
@@ -8775,6 +8781,14 @@ void Node3DEditor::_sun_direction_angle_set() {
 	_preview_settings_changed();
 }
 
+void Node3DEditor::_edit_resource_item(Ref<Resource> p_resource, bool p_edit) {
+	EditorNode::get_singleton()->open_request(p_resource->get_path());
+}
+
+void Node3DEditor::_item_changed(const Ref<Resource>& p_resource) {
+	character_path = p_resource->get_path();
+}
+
 Node3DEditor::Node3DEditor() {
 	gizmo.visible = true;
 	gizmo.scale = 1.0;
@@ -8989,6 +9003,14 @@ Node3DEditor::Node3DEditor() {
 	transform_menu->set_shortcut_context(this);
 	main_menu_hbox->add_child(transform_menu);
 
+	EditorResourcePicker* test = memnew(EditorResourcePicker);
+	test->set_base_type("PackedScene");
+	test->set_edited_resource(Ref<Resource>());
+
+	test->connect("resource_selected", callable_mp(this, &Node3DEditor::_edit_resource_item));
+	test->connect("resource_changed", callable_mp(this, &Node3DEditor::_item_changed));
+
+
 	p = transform_menu->get_popup();
 	p->add_shortcut(ED_SHORTCUT("spatial_editor/snap_to_floor", TTRC("Snap Object to Floor"), Key::PAGEDOWN), MENU_SNAP_TO_FLOOR);
 	p->add_shortcut(ED_SHORTCUT("spatial_editor/transform_dialog", TTRC("Transform Dialog...")), MENU_TRANSFORM_DIALOG);
@@ -9126,6 +9148,8 @@ Node3DEditor::Node3DEditor() {
 	settings_zfar->set_value(EDITOR_GET("editors/3d/default_z_far"));
 	settings_zfar->set_select_all_on_focus(true);
 	settings_vbc->add_margin_child(TTR("View Z-Far:"), settings_zfar);
+
+	settings_vbc->add_margin_child(TTR("Character"),test);
 
 	for (uint32_t i = 0; i < VIEWPORTS_COUNT; ++i) {
 		settings_dialog->connect(SceneStringName(confirmed), callable_mp(viewports[i], &Node3DEditorViewport::_view_settings_confirmed).bind(0.0));

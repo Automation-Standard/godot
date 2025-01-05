@@ -399,6 +399,14 @@ void EditorInterface::set_main_screen_editor(const String &p_name) {
 	EditorNode::get_singleton()->get_editor_main_screen()->select_by_name(p_name);
 }
 
+String EditorInterface::get_character_path() {
+	return Node3DEditor::get_singleton()->character_path;
+}
+
+void EditorInterface::toggle_first_person_mode() {
+	Node3DEditor::get_singleton()->first_person_mode = !Node3DEditor::get_singleton()->first_person_mode;
+}
+
 void EditorInterface::set_distraction_free_mode(bool p_enter) {
 	EditorNode::get_singleton()->set_distraction_free_mode(p_enter);
 }
@@ -774,6 +782,9 @@ void EditorInterface::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_plugin_enabled", "plugin", "enabled"), &EditorInterface::set_plugin_enabled);
 	ClassDB::bind_method(D_METHOD("is_plugin_enabled", "plugin"), &EditorInterface::is_plugin_enabled);
+
+	ClassDB::bind_method(D_METHOD("get_character_path"), &EditorInterface::get_character_path);
+	ClassDB::bind_method(D_METHOD("toggle_first_person_mode"), &EditorInterface::toggle_first_person_mode);
 
 	// Editor GUI.
 

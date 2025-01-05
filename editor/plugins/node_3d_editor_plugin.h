@@ -851,6 +851,10 @@ private:
 	void _sun_direction_input(const Ref<InputEvent> &p_event);
 	void _sun_direction_angle_set();
 
+	void _edit_resource_item(Ref<Resource> p_resource, bool p_edit);
+
+	void _item_changed(const Ref<Resource>& p_resource);
+
 	Vector2 sun_rotation;
 
 	Ref<Shader> sun_direction_shader;
@@ -909,6 +913,10 @@ public:
 	float get_znear() const { return settings_znear->get_value(); }
 	float get_zfar() const { return settings_zfar->get_value(); }
 	float get_fov() const { return settings_fov->get_value(); }
+
+	String character_path;
+
+	bool first_person_mode = false;
 
 	Transform3D get_gizmo_transform() const { return gizmo.transform; }
 	bool is_gizmo_visible() const;
