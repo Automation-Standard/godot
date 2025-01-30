@@ -305,7 +305,7 @@ void register_server_types() {
 
 	GLOBAL_DEF(PropertyInfo(Variant::STRING, PhysicsServer3DManager::setting_property_name, PROPERTY_HINT_ENUM, "DEFAULT"), "DEFAULT");
 
-	PhysicsServer3DManager::get_singleton()->register_server("Dummy", callable_mp_static(_create_dummy_physics_server_3d));
+	//PhysicsServer3DManager::get_singleton()->register_server("Dummy", callable_mp_static(_create_dummy_physics_server_3d));
 
 	GDREGISTER_ABSTRACT_CLASS(XRInterface);
 	GDREGISTER_CLASS(XRVRS);
