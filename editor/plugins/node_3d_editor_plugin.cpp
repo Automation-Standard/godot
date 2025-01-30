@@ -791,8 +791,12 @@ void Node3DEditorViewport::_select_clicked(bool p_allow_locked) {
 
 	if (p_allow_locked || (selected != nullptr && !_is_node_locked(selected))) {
 		if (clicked_wants_append) {
+			Node3D *active_node = Object::cast_to<Node3D>(editor_selection->get_selected_node_list().back()->get());
 			if (editor_selection->is_selected(selected)) {
 				editor_selection->remove_node(selected);
+				if (selected != active_node) {
+					editor_selection->add_node(selected);
+				}
 			} else {
 				editor_selection->add_node(selected);
 			}
@@ -1496,7 +1500,7 @@ void Node3DEditorViewport::_transform_gizmo_apply(Node3D *p_node, const Transfor
 	}
 }
 
-Transform3D Node3DEditorViewport::_compute_transform(TransformMode p_mode, const Transform3D &p_original, const Transform3D &p_original_local, Vector3 p_motion, double p_extra, bool p_local, bool p_orthogonal) {
+Transform3D Node3DEditorViewport::_compute_transform(TransformMode p_mode, const Transform3D &p_original, const Transform3D &p_original_local, const Basis &p_relative_basis, Vector3 p_motion, double p_extra, bool p_local, bool p_orthogonal, bool p_relative) {
 	switch (p_mode) {
 		case TRANSFORM_SCALE: {
 			if (_edit.snap || spatial_editor->is_snap_enabled()) {
@@ -1525,6 +1529,10 @@ Transform3D Node3DEditorViewport::_compute_transform(TransformMode p_mode, const
 			}
 
 			if (p_local) {
+				if (p_relative) {
+					return Transform3D(p_original_local.basis, p_original_local.origin + p_relative_basis.xform(p_motion));
+				}
+
 				return p_original_local.translated_local(p_motion);
 			}
 
@@ -1534,9 +1542,29 @@ Transform3D Node3DEditorViewport::_compute_transform(TransformMode p_mode, const
 			Transform3D r;
 
 			if (p_local) {
-				Vector3 axis = p_original_local.basis.xform(p_motion);
-				r.basis = Basis(axis.normalized(), p_extra) * p_original_local.basis;
-				r.origin = p_original_local.origin;
+				if (p_relative) {
+					Basis relative_rotation = p_relative_basis.orthonormalized();
+					Vector3 axis = relative_rotation.xform(p_motion).normalized();
+					Basis new_basis = Basis(axis, p_extra) * p_original_local.basis.orthonormalized();
+
+					Vector3 original_scale = Vector3(
+							p_original_local.basis.get_column(0).length(),
+							p_original_local.basis.get_column(1).length(),
+							p_original_local.basis.get_column(2).length());
+
+					new_basis = Basis(
+							new_basis.get_column(0) * original_scale.x,
+							new_basis.get_column(1) * original_scale.y,
+							new_basis.get_column(2) * original_scale.z);
+
+					r.basis = new_basis;
+					r.origin = p_original_local.origin;
+
+				} else {
+					Vector3 axis = p_original_local.basis.xform(p_motion);
+					r.basis = Basis(axis.normalized(), p_extra) * p_original_local.basis;
+					r.origin = p_original_local.origin;
+				}
 			} else {
 				Basis local = p_original.basis * p_original_local.basis.inverse();
 				Vector3 axis = local.xform_inv(p_motion);
@@ -5085,8 +5113,30 @@ void Node3DEditorViewport::commit_transform() {
 void Node3DEditorViewport::apply_transform(Vector3 p_motion, double p_snap) {
 	bool local_coords = (spatial_editor->are_local_coords_enabled() && _edit.plane != TRANSFORM_VIEW);
 	List<Node *> &selection = editor_selection->get_selected_node_list();
+	Basis last_basis;
+
+	if (selection.is_empty()) {
+		return;
+	}
+
+	Node3D *last_node_3d = nullptr;
+	for (List<Node *>::Element *E = selection.back(); E; E = E->prev()) {
+		last_node_3d = Object::cast_to<Node3D>(E->get());
+		if (last_node_3d) {
+			break;
+		}
+	}
+
+	if (!last_node_3d) {
+		return;
+	}
+
+	last_basis = last_node_3d->get_global_basis();
+
 	for (Node *E : selection) {
 		Node3D *sp = Object::cast_to<Node3D>(E);
+		bool is_relative = true;
+
 		if (!sp) {
 			continue;
 		}
@@ -5100,17 +5150,21 @@ void Node3DEditorViewport::apply_transform(Vector3 p_motion, double p_snap) {
 			continue;
 		}
 
+		if (!local_coords || last_node_3d == sp) {
+			is_relative = false;
+		}
+
 		if (se->gizmo.is_valid()) {
 			for (KeyValue<int, Transform3D> &GE : se->subgizmos) {
 				Transform3D xform = GE.value;
-				Transform3D new_xform = _compute_transform(_edit.mode, se->original * xform, xform, p_motion, p_snap, local_coords, _edit.plane != TRANSFORM_VIEW); // Force orthogonal with subgizmo.
+				Transform3D new_xform = _compute_transform(_edit.mode, se->original * xform, xform, last_basis, p_motion, p_snap, local_coords, _edit.plane != TRANSFORM_VIEW, is_relative); // Force orthogonal with subgizmo.
 				if (!local_coords) {
 					new_xform = se->original.affine_inverse() * new_xform;
 				}
 				se->gizmo->set_subgizmo_transform(GE.key, new_xform);
 			}
 		} else {
-			Transform3D new_xform = _compute_transform(_edit.mode, se->original, se->original_local, p_motion, p_snap, local_coords, sp->get_rotation_edit_mode() != Node3D::ROTATION_EDIT_MODE_BASIS && _edit.plane != TRANSFORM_VIEW);
+			Transform3D new_xform = _compute_transform(_edit.mode, se->original, se->original_local, last_basis, p_motion, p_snap, local_coords, sp->get_rotation_edit_mode() != Node3D::ROTATION_EDIT_MODE_BASIS && _edit.plane != TRANSFORM_VIEW, is_relative);
 			_transform_gizmo_apply(se->sp, new_xform, local_coords);
 		}
 	}
@@ -6238,7 +6292,7 @@ void Node3DEditor::update_transform_gizmo() {
 		for (const KeyValue<int, Transform3D> &E : se->subgizmos) {
 			Transform3D xf = se->sp->get_global_transform() * se->gizmo->get_subgizmo_transform(E.key);
 			gizmo_center += xf.origin;
-			if (count == 0 && local_gizmo_coords) {
+			if ((unsigned int)count == se->subgizmos.size() - 1 && local_gizmo_coords) {
 				gizmo_basis = xf.basis;
 			}
 			count++;
@@ -6262,7 +6316,7 @@ void Node3DEditor::update_transform_gizmo() {
 
 			Transform3D xf = sel_item->sp->get_global_transform();
 			gizmo_center += xf.origin;
-			if (count == 0 && local_gizmo_coords) {
+			if (count == selection.size() - 1 && local_gizmo_coords) {
 				gizmo_basis = xf.basis;
 			}
 			count++;
@@ -6271,7 +6325,7 @@ void Node3DEditor::update_transform_gizmo() {
 
 	gizmo.visible = count > 0;
 	gizmo.transform.origin = (count > 0) ? gizmo_center / count : Vector3();
-	gizmo.transform.basis = (count == 1) ? gizmo_basis : Basis();
+	gizmo.transform.basis = gizmo_basis;
 
 	for (uint32_t i = 0; i < VIEWPORTS_COUNT; i++) {
 		viewports[i]->update_transform_gizmo_view();
@@ -6363,17 +6417,25 @@ void Node3DEditor::_generate_selection_boxes() {
 	// This lets the user see where the selection is while still having a sense of depth.
 	Ref<SurfaceTool> st = memnew(SurfaceTool);
 	Ref<SurfaceTool> st_xray = memnew(SurfaceTool);
+	Ref<SurfaceTool> active_st = memnew(SurfaceTool);
+	Ref<SurfaceTool> active_st_xray = memnew(SurfaceTool);
 
 	st->begin(Mesh::PRIMITIVE_LINES);
 	st_xray->begin(Mesh::PRIMITIVE_LINES);
+	active_st->begin(Mesh::PRIMITIVE_LINES);
+	active_st_xray->begin(Mesh::PRIMITIVE_LINES);
 	for (int i = 0; i < 12; i++) {
 		Vector3 a, b;
 		aabb.get_edge(i, a, b);
 
 		st->add_vertex(a);
 		st->add_vertex(b);
+		active_st->add_vertex(a);
+		active_st->add_vertex(b);
 		st_xray->add_vertex(a);
 		st_xray->add_vertex(b);
+		active_st_xray->add_vertex(a);
+		active_st_xray->add_vertex(b);
 	}
 
 	Ref<StandardMaterial3D> mat = memnew(StandardMaterial3D);
@@ -6393,6 +6455,23 @@ void Node3DEditor::_generate_selection_boxes() {
 	mat_xray->set_transparency(StandardMaterial3D::TRANSPARENCY_ALPHA);
 	st_xray->set_material(mat_xray);
 	selection_box_xray = st_xray->commit();
+
+	Ref<StandardMaterial3D> active_mat = memnew(StandardMaterial3D);
+	active_mat->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
+	active_mat->set_flag(StandardMaterial3D::FLAG_DISABLE_FOG, true);
+	active_mat->set_albedo(selection_box_color * Color(1.5, 1.5, 1.5, 1));
+	active_mat->set_transparency(StandardMaterial3D::TRANSPARENCY_ALPHA);
+	active_st->set_material(active_mat);
+	active_selection_box = active_st->commit();
+
+	Ref<StandardMaterial3D> active_mat_xray = memnew(StandardMaterial3D);
+	active_mat_xray->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
+	active_mat_xray->set_flag(StandardMaterial3D::FLAG_DISABLE_FOG, true);
+	active_mat_xray->set_flag(StandardMaterial3D::FLAG_DISABLE_DEPTH_TEST, true);
+	active_mat_xray->set_albedo(selection_box_color * Color(1.5, 1.5, 1.5, 0.15));
+	active_mat_xray->set_transparency(StandardMaterial3D::TRANSPARENCY_ALPHA);
+	active_st_xray->set_material(active_mat_xray);
+	active_selection_box_xray = active_st_xray->commit();
 }
 
 Dictionary Node3DEditor::get_state() const {
@@ -7827,6 +7906,33 @@ void Node3DEditor::update_grid() {
 
 void Node3DEditor::_selection_changed() {
 	_refresh_menu_icons();
+
+	const HashMap<Node *, Object *> &selection = editor_selection->get_selection();
+
+	for (const KeyValue<Node *, Object *> &E : selection) {
+		Node3D *sp = Object::cast_to<Node3D>(E.key);
+		if (!sp) {
+			continue;
+		}
+
+		Node3DEditorSelectedItem *se = editor_selection->get_node_editor_data<Node3DEditorSelectedItem>(sp);
+		if (!se) {
+			continue;
+		}
+
+		if (sp == editor_selection->get_selected_node_list().back()->get()) {
+			RenderingServer::get_singleton()->instance_set_base(se->sbox_instance, active_selection_box->get_rid());
+			RenderingServer::get_singleton()->instance_set_base(se->sbox_instance_xray, active_selection_box_xray->get_rid());
+			RenderingServer::get_singleton()->instance_set_base(se->sbox_instance_offset, active_selection_box->get_rid());
+			RenderingServer::get_singleton()->instance_set_base(se->sbox_instance_xray_offset, active_selection_box_xray->get_rid());
+		} else {
+			RenderingServer::get_singleton()->instance_set_base(se->sbox_instance, selection_box->get_rid());
+			RenderingServer::get_singleton()->instance_set_base(se->sbox_instance_xray, selection_box_xray->get_rid());
+			RenderingServer::get_singleton()->instance_set_base(se->sbox_instance_offset, selection_box->get_rid());
+			RenderingServer::get_singleton()->instance_set_base(se->sbox_instance_xray_offset, selection_box_xray->get_rid());
+		}
+	}
+
 	if (selected && editor_selection->get_selected_node_list().size() != 1) {
 		Vector<Ref<Node3DGizmo>> gizmos = selected->get_gizmos();
 		for (int i = 0; i < gizmos.size(); i++) {

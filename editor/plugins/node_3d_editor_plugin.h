@@ -512,7 +512,7 @@ private:
 
 	void _project_settings_changed();
 
-	Transform3D _compute_transform(TransformMode p_mode, const Transform3D &p_original, const Transform3D &p_original_local, Vector3 p_motion, double p_extra, bool p_local, bool p_orthogonal);
+	Transform3D _compute_transform(TransformMode p_mode, const Transform3D &p_original, const Transform3D &p_original_local, const Basis &p_relative_basis, Vector3 p_motion, double p_extra, bool p_local, bool p_orthogonal, bool p_relative);
 
 	void begin_transform(TransformMode p_mode, bool instant);
 	void commit_transform();
@@ -694,8 +694,6 @@ private:
 	real_t snap_rotate_value;
 	real_t snap_scale_value;
 
-	Ref<ArrayMesh> selection_box_xray;
-	Ref<ArrayMesh> selection_box;
 	RID indicators;
 	RID indicators_instance;
 	RID cursor_mesh;
@@ -901,6 +899,11 @@ protected:
 	static void _bind_methods();
 
 public:
+	Ref<ArrayMesh> active_selection_box_xray;
+	Ref<ArrayMesh> active_selection_box;
+	Ref<ArrayMesh> selection_box_xray;
+	Ref<ArrayMesh> selection_box;
+
 	static Node3DEditor *get_singleton() { return singleton; }
 
 	static Size2i get_camera_viewport_size(Camera3D *p_camera);
